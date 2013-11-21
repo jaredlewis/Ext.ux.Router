@@ -79,10 +79,9 @@ Ext.define('Ext.ux.Router', {
         var me = this,
             history = Ext.History;
 
-        if (!app || !app.routes) {
+        if (!app) {
             return;
         }
-
         me.processRoutes(app);
 
         if (me.ready) {
@@ -141,8 +140,26 @@ Ext.define('Ext.ux.Router', {
      */
     processRoutes: function(app) {
         var key,
-            appRoutes = app.routes;
+            appRoutes = app.routes || {};
 
+        // Append any routes from the controllers
+        var controllers = app.controllers.items;
+        for (index in controllers) {
+            var controller = controllers[index];
+            var routes = controller.routes;
+            if (routes) {
+                // Ensure the routes have the controller set
+                for (key in routes) {
+                    var route = routes[key];
+                    if (!route.controller) {
+                        route.controller = Ext.getClassName(controller);
+                    }
+                }
+                Ext.apply(appRoutes, routes);
+            }
+        }
+
+        // Process the routes that are present on the application
         for (key in appRoutes) {
             if (appRoutes.hasOwnProperty(key)) {
                 this.routeMatcher(app, key, appRoutes[key]);
