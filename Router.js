@@ -9,10 +9,10 @@
  /*
  * @class Ext.ux.Router
  * @extend Ext.app.Controller
- * 
- * Enables routing engine for Ext JS 4 MVC architecture. Responsible for parsing URI Token and fire a dispatch action 
+ *
+ * Enables routing engine for Ext JS 4 MVC architecture. Responsible for parsing URI Token and fire a dispatch action
  * process. Uses Ext.History internally to detect URI Token changes, providing browser history navigation capabilities.
- * 
+ *
  *      Ext.application({
  *          name: 'MyApp',
  *          ...
@@ -25,9 +25,9 @@
  *              'users/:id/edit': 'users#edit'
  *          }
  *      });
- * 
+ *
  * Given the routing example above, we would develop controllers specifying their correspondents actions.
- * 
+ *
  *      Ext.define('AM.controller.Users', {
  *          extend: 'Ext.app.Controller',
  *          views: ['user.List', 'user.Edit'],
@@ -55,18 +55,21 @@ Ext.define('Ext.ux.Router', {
         observable: 'Ext.util.Observable'
     },
     requires: [
-        'Ext.util.History', 
+        'Ext.util.History',
         'Ext.app.Application'
     ],
-    
+    enabled: true,
+    ignoreNextDispatch: false,
+
     // @private
     constructor: function() {
         var me = this;
+        me.enabled = true;
         me.ready = false;
         me.routes = [];
         me.mixins.observable.constructor.call(me);
     },
-    
+
     /**
      * Processes the routes for the given app and initializes Ext.History. Also parses
      * the initial token, generally main, home, index, etc.
@@ -75,26 +78,26 @@ Ext.define('Ext.ux.Router', {
     init: function(app) {
         var me = this,
             history = Ext.History;
-        
+
         if (!app || !app.routes) {
             return;
         }
-        
+
         me.processRoutes(app);
-            
+
         if (me.ready) {
             return;
         }
         me.ready = true;
-        
+
         me.addEvents(
             /**
              * @event routemissed
              * Fires when no route is found for a given URI Token
              * @param {String} uri The URI Token
              */
-            'routemissed', 
-        
+            'routemissed',
+
             /**
              * @event beforedispatch
              * Fires before loading controller and calling its action.  Handlers can return false to cancel the dispatch
@@ -103,8 +106,8 @@ Ext.define('Ext.ux.Router', {
              * @param {Object} match Route that matched the URI Token.
              * @param {Object} params The params appended to the URI Token.
              */
-            'beforedispatch', 
-        
+            'beforedispatch',
+
             /**
             * @event dispatch
             * Fires after loading controller and calling its action.
@@ -115,13 +118,21 @@ Ext.define('Ext.ux.Router', {
             */
             'dispatch'
         );
-        
+
         history.init();
 		history.on('change', me.parse, me);
-		
+
         Ext.onReady(function() {
             me.parse(history.getToken());
         });
+    },
+
+    setEnabled: function(enabled){
+        this.enabled = enabled;
+    },
+
+    ignoreNext: function(){
+        this.ignoreNextDispatch = true;
     },
 
     /**
@@ -131,7 +142,7 @@ Ext.define('Ext.ux.Router', {
     processRoutes: function(app) {
         var key,
             appRoutes = app.routes;
-        
+
         for (key in appRoutes) {
             if (appRoutes.hasOwnProperty(key)) {
                 this.routeMatcher(app, key, appRoutes[key]);
@@ -140,10 +151,10 @@ Ext.define('Ext.ux.Router', {
     },
 
     /**
-     * Creates a matcher for a route config, based on 
+     * Creates a matcher for a route config, based on
      * {@link https://github.com/cowboy/javascript-route-matcher javascript-route-matcher}
      * @private
-     */ 
+     */
     routeMatcher: function(app, route, rules) {
         var routeObj, action,
             me      = this,
@@ -161,7 +172,7 @@ Ext.define('Ext.ux.Router', {
                 controller  : rules.controller,
                 action      : rules.action
             };
-            
+
             delete rules.controller;
             delete rules.action;
             routeObj.rules = rules;
@@ -171,7 +182,7 @@ Ext.define('Ext.ux.Router', {
                 names.push(name);
                 return mode === ":" ? "([^/]*)" : "(.*)";
             });
-            
+
             routeObj = {
                 app         : app,
                 route       : route,
@@ -179,10 +190,10 @@ Ext.define('Ext.ux.Router', {
                 matcher     : new RegExp("^" + reRoute + "$"),
                 manageArgs  : route.indexOf('?') !== -1
             };
-            
+
             if (Ext.isString(rules)) {
                 action = rules.split('#');
-                
+
                 routeObj.controller = action[0];
                 routeObj.action     = action[1];
                 routeObj.rules      = undefined;
@@ -190,23 +201,23 @@ Ext.define('Ext.ux.Router', {
             else {
                 routeObj.controller = rules.controller;
                 routeObj.action     = rules.action;
-                
+
                 delete rules.controller;
                 delete rules.action;
                 routeObj.rules = rules;
             }
         }
-        
+
         //<debug error>
         if (!routeObj.controller && Ext.isDefined(Ext.global.console)) {
             Ext.global.console.error("[Ext.ux.Router] Config 'controller' can't be undefined", route, rules);
         }
-    
+
         if (!routeObj.action && Ext.isDefined(Ext.global.console)) {
             Ext.global.console.error("[Ext.ux.Router] Config 'action' can't be undefined", route, rules);
         }
         //</debug>
-        
+
         routes.push(routeObj);
     },
 
@@ -216,6 +227,14 @@ Ext.define('Ext.ux.Router', {
      * @private
      */
     parse: function(token) {
+        if(this.enabled === false){
+            return false;
+        }
+        if(this.ignoreNextDispatch === true){
+            this.ignoreNextDispatch = false;
+            return false;
+        }
+
         var route, matches, params, names, j, param, value, rules,
             tokenArgs, tokenWithoutArgs,
             me      = this,
@@ -227,16 +246,16 @@ Ext.define('Ext.ux.Router', {
         tokenWithoutArgs = token.split('?');
         tokenArgs        = tokenWithoutArgs[1];
         tokenWithoutArgs = tokenWithoutArgs[0];
-        
+
         for (; i < len; i++) {
             route = routes[i];
-            
+
             if (route.regex) {
                 matches = token.match(route.regex);
-                
+
                 if (matches) {
                     matches = matches.slice(1);
-                    
+
                     if (me.dispatch(token, route, matches)) {
                         return { captures: matches };
                     }
@@ -244,45 +263,45 @@ Ext.define('Ext.ux.Router', {
             }
             else {
                 matches = route.manageArgs ? token.match(route.matcher) : tokenWithoutArgs.match(route.matcher);
-                
+
                 // special index rule
                 if (tokenWithoutArgs === '' && route.route === '/' || tokenWithoutArgs === '/' && route.route === '') {
                     matches = [];
                 }
-                
+
                 if (matches) {
                     params  = {};
                     names   = route.names;
                     rules   = route.rules;
                     j       = 0;
-                    
+
                     while (j < names.length) {
                         param = names[j++];
                         value = matches[j];
-          
+
                         if (rules && param in rules && !this.validateRule(rules[param], value)) {
                             matches = false;
                             break;
                         }
-                        
+
                         params[param] = value;
                     }
-                    
+
                     if (tokenArgs && !route.manageArgs) {
                         params = Ext.applyIf(params, Ext.Object.fromQueryString(tokenArgs));
                     }
-                    
+
                     if (matches && me.dispatch(token, route, params)) {
                         return params;
                     }
                 }
             }
         }
-        
+
         me.fireEvent('routemissed', token);
         return false;
     },
-    
+
     /**
      * Each route can have rules, and this function ensures these rules. They could be Functions,
      * Regular Expressions or simple string strong comparisson.
@@ -295,42 +314,46 @@ Ext.define('Ext.ux.Router', {
         else if (Ext.isFunction(rule.test)) {
             return rule.test(value);
         }
-        
+
         return rule === value;
     },
-    
+
     /**
-     * Tries to dispatch a route to the controller action. Fires the 'beforedispatch' and 
+     * Tries to dispatch a route to the controller action. Fires the 'beforedispatch' and
      * 'dispatch' events.
      * @private
-     */    
+     */
     dispatch: function(token, route, params) {
         var controller,
             me = this;
-        
+
+        if(this.enabled === false){
+            return false;
+        }
+
         if (me.fireEvent('beforedispatch', token, route, params) === false) {
             return false;
         }
-        
+
         controller = me.getController(route);
-        
+
         if (!controller) {
             return false;
         }
-        
+
         //<debug error>
         if (!controller[route.action] && Ext.isDefined(Ext.global.console)) {
             Ext.global.console.error("[Ext.ux.Router] Controller action not found ", route.controller, route.action);
             return false;
         }
         //</debug>
-        
+
         controller[route.action].call(controller, params, token, route);
         me.fireEvent('dispatch', token, route, params, controller);
-        
+
         return true;
     },
-    
+
     /**
      * Redirects the page to other URI.
      * @param {String} uri URI Token
@@ -340,7 +363,7 @@ Ext.define('Ext.ux.Router', {
      */
     redirect: function(token, preventDup) {
         var history = Ext.History;
-        
+
         if (preventDup !== false && history.getToken() === token) {
             this.parse(token);
         }
@@ -348,10 +371,10 @@ Ext.define('Ext.ux.Router', {
             history.add(token);
         }
     },
-    
+
     /**
-     * Utility method that receives a route and returns the  controller instance. 
-     * Controller name could be either the regular name (e.g. UserSettings), a 
+     * Utility method that receives a route and returns the  controller instance.
+     * Controller name could be either the regular name (e.g. UserSettings), a
      * string to be capitalized (e.g. userSettings -> UserSettings) or even separated
      * by namespace  (e.g. user.Settings).
      */
@@ -363,28 +386,28 @@ Ext.define('Ext.ux.Router', {
 
         // try regular name
         controllerFullName = app.getModuleClassName(controller, 'controller');
-        
+
         if (!classMgr.get(controllerFullName)) {
-            
+
             // try capitalized
             controller          = Ext.String.capitalize(controller);
             controllerFullName  = app.getModuleClassName(controller, 'controller');
-            
+
             if (!classMgr.get(controllerFullName)) {
-                
+
                 //<debug>
                 if (Ext.isDefined(Ext.global.console)) {
                     Ext.global.console.warn("[Ext.ux.Router] Controller not found ", route.controller);
                 }
                 //</debug>
-                
+
                 return false;
             }
 
             // fix controller name
             route.controller = controller;
         }
-        
+
         return app.getController(controller);
     }
 },
@@ -396,7 +419,7 @@ function() {
         enableRouter: true,
         onBeforeLaunch: function() {
             this.callOverridden();
-        
+
             if(this.enableRouter){
                 Ext.ux.Router.init(this);
             }
