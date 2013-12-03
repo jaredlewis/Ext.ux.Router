@@ -141,6 +141,7 @@ Ext.define('Ext.ux.Router', {
     processRoutes: function(app) {
         var key,
             appRoutes = app.routes || {};
+        this.routes = [];
 
         // Append any routes from the controllers
         var controllers = app.controllers.items;
@@ -162,7 +163,7 @@ Ext.define('Ext.ux.Router', {
         // Process the routes that are present on the application
         for (key in appRoutes) {
             if (appRoutes.hasOwnProperty(key)) {
-                this.routeMatcher(app, key, appRoutes[key]);
+                this.routeMatcher(app, key, Ext.clone(appRoutes[key]));
             }
         }
     },
@@ -272,7 +273,6 @@ Ext.define('Ext.ux.Router', {
 
                 if (matches) {
                     matches = matches.slice(1);
-
                     if (me.dispatch(token, route, matches)) {
                         return { captures: matches };
                     }
